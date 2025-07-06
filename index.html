@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Secure Audio Player</title>
+  <script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.25.6/babel.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+
+    const API_BASE_URL = "https://otp-wif3.onrender.com";
+    const AUDIO_ID = 8; // ID звонка
+
+    const { useState, useEffect } = React;
+
+    const App = () => {
+      const [login, setLogin] = useState('');
+      const [password, setPassword] = useState('');
+      const [loggedIn, setLoggedIn] = useState(false);
+      const [apiKey, setApiKey] = useState(null);
+      const [userId, setUserId] = useState(null);
+      const [audioUrl, setAudioUrl] = useState(null);
+      const [error, setError] = useState(null);
+
+      const handleLogin = async () => {
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ login, password })
+          });
+
+          const data = await res.json();
+
+          if (data.status === 'success') {
+            setApiKey(data.apiKey);
+            setUserId(data.id);
+            setLoggedIn(true);
+            setError(null);
+          } else {
+            setError(data.error || 'Неверные данные');
+          }
+        } catch (err) {
+          setError('Ошибка входа: ' + err.message);
+        }
+      };
+
+      useEffect(() => {
+        const fetchAudio = async () => {
+          if (!apiKey || !userId) return;
+          try {
+            const response = await fetch(`${API_BASE_URL}/api/audio/${AUDIO_ID}`, {
+              method: 'GET',
+              headers: {
+                'X-API-Key': apiKey,
+                'X-User-Id': userId
+              }
+            });
+
+            if (!response.ok) throw new Error(`Ошибка загрузки: ${response.status}`);
+            const blob = await response.blob();
+            setAudioUrl(URL.createObjectURL(blob));
+          } catch (err) {
+            console.error('Ошибка при загрузке аудио:', err);
+            setError(err.message);
+          }
+        };
+
+        fetchAudio();
+      }, [apiKey, userId]);
+
+      return (
+        <div style={{ padding: 20, fontFamily: 'sans-serif' }}>
+          <h2>Аудио-плеер</h2>
+
+          {!loggedIn ? (
+            <>
+              <input
+                type="text"
+                placeholder="Логин"
+                value={login}
+                onChange={(e) => setLogin(e.target.value)}
+                style={{ padding: '8px', marginBottom: '10px', display: 'block', width: '100%' }}
+              />
+              <input
+                type="password"
+                placeholder="Пароль"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                style={{ padding: '8px', marginBottom: '10px', display: 'block', width: '100%' }}
+              />
+              <button onClick={handleLogin} style={{ padding: '10px 20px' }}>
+                Войти
+              </button>
+              {error && <p style={{ color: 'red' }}>{error}</p>}
+            </>
+          ) : (
+            <>
+              <p style={{ color: 'green' }}>Вы вошли как пользователь ID: {userId}</p>
+              {audioUrl ? (
+                <audio controls src={audioUrl} style={{ width: "100%", marginTop: '20px' }} />
+              ) : (
+                <p>Загрузка аудио...</p>
+              )}
+              {error && <p style={{ color: 'red' }}>{error}</p>}
+            </>
+          )}
+        </div>
+      );
+    };
+
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+</html>
